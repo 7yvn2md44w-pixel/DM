@@ -1,0 +1,128 @@
+<!DOCTYPE html>
+<html lang="ja"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>デュエル(COM対戦)</title>
+<style>
+:root{box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+body{margin:0;background:#12151f;color:#e8ecf5;font-family:sans-serif;font-size:13px}
+.w{max-width:600px;margin:0 auto;padding:8px}
+.z{background:#1b2030;border-radius:8px;padding:6px;margin:6px 0}
+.h{font-size:12px;color:#9aa6c4;margin:3px 0}
+.row{display:flex;flex-wrap:wrap;gap:4px;min-height:40px}
+.card{width:72px;border-radius:6px;padding:3px;font-size:10px;border:2px solid #0000;cursor:pointer;color:#111}
+.card b{display:block;font-size:11px}
+.r{background:#f08a6a}.b{background:#6ab4f0}.g{background:#8fd37a}.y{background:#f2e08a}.k{background:#a98fd0}
+.t{transform:rotate(90deg);margin:0 12px;opacity:.6}
+.sel{border-color:#fff;box-shadow:0 0 6px #fff}.tg{border-color:#f33}
+.sh{width:26px;height:36px;background:#445;border-radius:4px}
+.mn{width:18px;height:24px;border-radius:3px}
+button{background:#3a5bd9;color:#fff;border:0;border-radius:6px;padding:8px 10px;margin:2px;font-size:13px}
+button:disabled{opacity:.4}
+.dk{display:block;width:100%;text-align:left;padding:10px;margin:5px 0;color:#111;font-size:12px}
+#log{height:90px;overflow:auto;font-size:11px;color:#b9c3dd;background:#0d1019;border-radius:6px;padding:4px}
+</style></head><body><div class="w">
+<div id="sel"></div>
+<div id="g" style="display:none"><div id="com" class="z"></div><div id="log"></div><div id="me" class="z"></div><div id="ac"></div></div></div>
+<script>
+// [名前,コスト,パワー,種別(c/s/e=進化),能力,効果,枚数]
+// 能力 s=SA w=Wブレイカー b=ブロッカー t=S・トリガー f=マッハファイター r=コスト軽減
+// 効果 d=ドロー m=マナ加速 h=シールド追加 x=破壊(:Nで パワーN000以下) u=バウンス k=マナ破壊 r=ハンデス p=相手全体パワー−N000(ターン中) q=お互いN枚ハンデス c=山札からコストN以下を召喚 a=手札からコストN以下を召喚 v=墓地からコストが低いクリーチャーを蘇生 z=墓地からコストが低い呪文を再発動 ("|"で複合)
+const DK={
+r1:[["ボルカノ",1,1000,"c","s","",3],["竜の幼体",1,2000,"c","","",1],["烈火ナイト",2,2000,"c","s","",4],["疾風の火兵",2,3000,"c","","",4],["炎の槍兵",3,3000,"c","s","",4],["爆炎の戦士",4,3000,"c","sw","",3],["烈火の戦士",4,4000,"c","","",3],["火炎竜ガイア",5,5000,"c","w","",3],["爆炎竜王",6,5000,"c","sw","",2],["バーンスラッシュ",2,0,"s","","x1:2",4],["火炎の爆撃",4,0,"s","","x1:4",2],["炎の大爆発",6,0,"s","","x2:5",2],["ファイア・トラップ",3,0,"s","t","x1:3",3],["突撃の火兵",4,4000,"c","t","",2]],
+r2:[["竜の幼体",1,2000,"c","","",4],["火炎の若竜",2,4000,"c","","",4],["紅蓮の竜騎士",3,3000,"c","","",4],["爆炎の飛竜",3,2000,"c","s","",3],["烈火の竜戦士",4,3000,"c","s","",4],["炎竜ガイア",5,5000,"c","w","",2],["疾風の炎竜",5,5000,"c","sw","",1],["爆炎竜ヴォルカ",5,9000,"e","w","",4],["覇炎竜王",7,13000,"e","sw","",2],["終焉の炎竜",8,16000,"e","w","x1:7",1],["炎の落雷",2,0,"s","","x1:2",4],["ドラゴン・ブレス",5,0,"s","","x2:4",2],["フレア・トラップ",3,0,"s","t","x1:3",3],["炎の番竜",4,4000,"c","t","",2]],
+b1:[["水晶の番人",1,1000,"c","b","",3],["水の守護者",2,2000,"c","b","d1",2],["水の探究者",2,3000,"c","","d1",3],["海の賢者",3,3000,"c","","d2",3],["蒼き学者",4,4000,"c","","d1",2],["サイバー・ウィザード",4,4000,"c","","d1|u1",1],["ブレイン・チャージ",2,0,"s","","d2",4],["大洪水",5,0,"s","","d3",2],["ウェーブ・ストライク",3,0,"s","t","u1",4],["ブレイン・ウェーブ",3,0,"s","t","d2",4],["潮流の見張り",4,4000,"c","t","d1",4],["サイバー・ロード",5,9000,"e","w","d2",3],["電脳神ネプチューン",7,12000,"e","w","d3",2],["深海の巨獣",6,6000,"c","b","",2],["氷河の王",7,9000,"c","wb","d2",1]],
+b2:[["水晶の番人",1,1000,"c","b","",3],["水の見習い",1,2000,"c","","",4],["水の守護者",2,2000,"c","b","d1",2],["水の巡回兵",2,3000,"c","","",3],["海の賢者",3,3000,"c","","d2",3],["水の戦士",3,3000,"c","","",2],["海の兵長",4,4000,"c","","",2],["潮流の見張り",4,4000,"c","t","d1",4],["潮の召喚師",5,5000,"c","","a3",2],["潮流の大帝",6,6000,"c","wb","a4",2],["深海の覇王",7,9000,"c","wb","a5|d1",1],["ブレイン・チャージ",2,0,"s","","d2",3],["ウェーブ・ストライク",3,0,"s","t","u1",4],["ブレイン・ウェーブ",3,0,"s","t","d2",4],["大洪水",5,0,"s","","d3",1]],
+g1:[["根の精霊",1,1000,"c","","m1",3],["森の精霊",2,2000,"c","","m1",4],["芽吹きの獣",3,3000,"c","","m1",4],["森の長老",4,4000,"c","","m1",3],["森の番人",4,4000,"c","t","m1",3],["大地ビースト",5,5000,"c","t","m1",3],["野生の戦士",4,5000,"c","b","",1],["古木の巨人",6,8000,"c","w","",3],["世界樹ドラゴン",7,10000,"c","wb","",3],["大自然の神獣",7,12000,"e","w","m1",2],["原生林の主",8,12000,"c","wb","",1],["マナ・ブースト",2,0,"s","","m2",4],["大地の恵み",4,0,"s","","m3",2],["緑の奇跡",3,0,"s","t","m2",4]],
+g2:[["疾走の狼",2,2000,"c","f","",4],["野牛の戦士",3,3000,"c","f","",4],["突進の大猪",4,5000,"c","f","",3],["疾走の熊",4,4000,"c","f","",3],["野生の戦士",3,3000,"c","b","",2],["猛獣王",5,6000,"c","wr","",3],["大地の巨獣",6,7000,"c","wr","",4],["樹海の巨神",7,9000,"c","wbr","",3],["太古の巨神",8,13000,"e","wr","",2],["大地の守り手",3,3000,"c","t","",4],["樹海の戦士",4,4000,"c","t","",3],["森の奇襲",3,0,"s","t","x1:3",3],["野生の怒り",4,0,"s","","x1:4",2]],
+y1:[["光の見習い",1,1000,"c","b","",1],["光の見習い",1,2000,"c","","",3],["光の守り手",2,2000,"c","bt","h1",4],["聖なる盾",3,2000,"c","b","h1",2],["聖なる巫女",3,3000,"c","","",3],["光の騎士",4,5000,"c","","",3],["天使ルミナ",5,6000,"c","w","",3],["聖域の守護者",5,5000,"c","bt","",3],["光の守護神",6,8000,"c","w","",2],["光の裁定者",7,9000,"c","w","y1",1],["光神ミカエル",6,9000,"e","w","",2],["光神ガブリエル",7,11000,"e","w","",1],["天の封印",5,0,"s","","y1",1],["聖なる大封印",6,0,"s","","n2",2],["ホーリー・シールド",3,0,"s","t","h2",2],["光の裁き",3,0,"s","t","x1:3",4],["天罰",5,0,"s","t","x1:5",3]],
+y2:[["光の見習い",1,1000,"c","b","",3],["光の守り手",2,2000,"c","bt","",4],["光の司祭",3,3000,"c","","c1",3],["光の使者",4,4000,"c","","c2",4],["光の槍兵",4,5000,"c","t","",2],["聖なる召喚士",5,5000,"c","","c3",3],["聖域の守護者",5,6000,"c","t","",3],["天使ルミナ",5,6000,"c","w","c3",2],["聖域の天使",6,6000,"c","wb","c4",3],["光神ミカエル",7,9000,"c","w","c5",2],["天空の大天使",8,12000,"c","w","c6",1],["光の啓示",3,0,"s","","c2",3],["光の裁き",3,0,"s","t","x1:3",4],["天罰",5,0,"s","t","x1:5",3]],
+k1:[["闇の斥候",2,2000,"c","","r1",3],["死霊術師",3,3000,"c","","r1",3],["影の暗殺者",4,4000,"c","","x1:3",2],["闇の盗賊",4,4000,"c","","k1|r1",2],["亡者の騎士",5,5000,"c","b","x1:4",2],["暗黒竜",6,7000,"c","wb","",2],["魔王デス",7,10000,"c","w","x1:6",2],["冥界の王",6,10000,"e","w","k2",1],["死神ゴルゴ",7,11000,"e","w","x2:6",1],["デス・スラッシュ",3,0,"s","","x1:3",4],["破滅の闇",6,0,"s","","x2:5",2],["マナ・ドレイン",2,0,"s","","k2",2],["ハンデス・ブレード",3,0,"s","","r2",2],["呪縛の闇",3,0,"s","","p2",2],["暗黒の対価",4,0,"s","","q2",2],["闇の罠",3,0,"s","t","x1:3",4],["亡霊の見張り",4,4000,"c","t","",4]],
+k2:[["骸骨兵",1,1000,"c","b","",3],["亡霊の兵",2,3000,"c","","",3],["墓守の少年",2,2000,"c","","v1",4],["死霊術師",3,3000,"c","","v1",4],["亡者の騎士",4,4000,"c","","v1",3],["屍の魔王",6,8000,"c","w","v2",3],["冥界の王",7,10000,"c","wb","v3",2],["死神ゴルゴ",7,11000,"e","w","v2",1],["魂の呼び声",4,0,"s","","v2",2],["死者の行進",3,0,"s","","v1",2],["悪夢の再演",5,0,"s","","z1",3],["デス・スラッシュ",3,0,"s","","x1:3",2],["闇の罠",3,0,"s","t","x1:3",4],["亡霊の見張り",4,4000,"c","t","",4]],
+f1:[["ボルカノ",1,1000,"c","s","",2],["竜の幼体",1,2000,"c","","",4],["烈火ナイト",2,2000,"c","s","",2],["疾風の火兵",2,3000,"c","","",4],["炎の槍兵",3,3000,"c","","",4],["烈火の戦士",4,4000,"c","","",3],["爆炎の戦士",4,4000,"c","w","",3],["火炎竜ガイア",5,5000,"c","w","",2],["爆炎竜王",6,6000,"c","w","",2],["バーンスラッシュ",2,0,"s","","x1:2",3],["火炎の爆撃",4,0,"s","","x1:4",2],["禁断の鍵",2,0,"s","","o1",3],["ファイア・トラップ",3,0,"s","t","x1:3",3],["突撃の火兵",4,4000,"c","t","",2]]};
+const DN={r1:["火","低コスト速攻","低コストのSAで一気に攻める(S・T5)"],r2:["火","ドラゴン","低コストを種に大型へ進化。高パワー・Wブレイカー(S・T5)"],b1:["水","サイバー","大量ドローから進化・大型へつなぐ(S・T12)"],b2:["水","アトラス","ドローで整え、小型を並べ大型で手札から追加召喚(S・T12)"],g1:["自然","マナ加速","小型でマナを貯め重量級を早く出す(S・T10)"],g2:["自然","コスト軽減","マッハファイターで攻め、味方をタップして大型を出す(S・T10)"],y1:["光","シールド","シールドを増やし(上限8枚)、相手のクリーチャーやマナを盾に貼り付けて守る(S・T16)"],y2:["光","メクレイド","小型ブロッカーで守り、大型で山札から召喚(S・T16)"],k1:["闇","破壊","破壊・パワー低下・ハンデス・マナ破壊(S・T8)"],k2:["闇","墓地","墓地のクリーチャーや呪文を蘇生・再発動(S・T8)"],f1:["火","禁断","禁断の封印6枚が外れると真の姿を解放し、相手の全クリーチャーを封印(S・T5)"]};
+const AB={s:"SA",w:"W",b:"B",t:"ST",f:"マッハ",r:"軽減"},FN={d:"ドロー",m:"マナ+",h:"盾+",y:"敵→盾",o:"封印解除",n:"敵マナ→盾",x:"破壊",u:"バウンス",k:"マナ破壊",r:"ハンデス",p:"パワー−",q:"相互ハンデス",c:"山札召喚≤",a:"手札召喚≤",v:"蘇生",z:"呪文再発動"};
+const sh=a=>{for(let i=a.length-1;i>0;i--){const j=Math.random()*(i+1)|0;[a[i],a[j]]=[a[j],a[i]]}return a};
+const sleep=ms=>new Promise(r=>setTimeout(r,ms)),$=id=>document.getElementById(id);
+const log=s=>{const l=$("log");l.innerHTML+=s+"<br>";l.scrollTop=1e5};
+const ep=c=>c.pw+(c.mod||0),strong=a=>[...a].sort((x,y)=>ep(y)-ep(x))[0],best=a=>[...a].sort((x,y)=>y.cost-x.cost||y.pw-x.pw)[0];
+function mk(k){const d=[];DK[k].forEach(e=>{for(let i=0;i<e[6];i++)d.push({n:e[0],c:k=="f1"?"r":k[0],cost:e[1],pw:e[2],ty:e[3],ab:e[4],fx:e[5]})});sh(d);const o={deck:d,shields:d.splice(0,5),hand:d.splice(0,5),mana:[],bz:[],gy:[]};if(k=="f1")o.fb={seals:d.splice(0,6),flipped:false};return o}
+let P,cur,over,charged,sh1,sc,first,pend=null,evo=false;
+function pick(){$("g").style.display="none";$("sel").innerHTML="<h3>デッキを選んでください(各40枚)</h3>"+Object.keys(DN).map(k=>`<button class="dk card ${k=="f1"?"r":k[0]}" onclick="start('${k}')"><b style="font-size:15px">${DN[k][0]}文明:${DN[k][1]}</b>${DN[k][2]}</button>`).join("")+`<div class="h">SA=スピードアタッカー W=Wブレイカー B=ブロッカー ST=S・トリガー マッハ=マッハファイター(召喚ターンにクリーチャーのみ攻撃可、アンタップ中の相手にも攻撃可) 軽減=攻撃可能な味方をタップしてコスト支払い可 封印=封印されたクリーチャーは攻撃・ブロック不可。持ち主がクリーチャーを出すたび1枚剥がれる(剥がれた封印は墓地へ。禁断自身の封印は手札へ)</div>`}
+function start(k){const ks=Object.keys(DN),ck=ks[Math.random()*ks.length|0];$("sel").innerHTML="";$("g").style.display="";P=[mk(k),mk(ck)];over=false;first=true;$("log").innerHTML="";log(`あなた:${DN[k][0]}(${DN[k][1]}) / COM:${DN[ck][0]}(${DN[ck][1]})。あなたの先攻です。`);turn(0)}
+function turn(i){if(over)return;cur=i;P.forEach(p=>p.bz.forEach(c=>{c.mod=0;c.fresh=false}));const A=P[i];A.mana.forEach(m=>m.t=false);A.bz.forEach(c=>{c.t=false;c.sick=false});charged=false;evo=false;sh1=sc=null;
+ if(!(first&&i==0)){if(!A.deck.length)return end(1-i,"(山札切れ)");A.hand.push(A.deck.pop())}first=false;
+ log(i?"--- COMのターン ---":"--- あなたのターン ---");render();if(i)com()}
+function end(w,why=""){over=true;log(w==0?"🎉 あなたの勝利!"+why:"💀 あなたの敗北…"+why);render()}
+function ftxt(c){return c.fx?c.fx.split("|").map(x=>{const[a,l]=x.split(":");return FN[a[0]]+a.slice(1)+(l?"(≤"+l+"k)":"")}).join(" "):""}
+function card(c,k,f){const s=c.ty=="s";return `<div class="card ${c.c} ${c.t?"t":""} ${k||""}" onclick="${f||""}"><b>${c.n}</b>${s?"呪文":c.ty=="e"?"進化":""}${c.cost}${s?"":" / "+ep(c)}<br>${[...c.ab].map(x=>AB[x]).join(" ")}<br>${ftxt(c)}${c.seals&&c.seals.length?"<br>🔒封印"+c.seals.length:""}</div>`}
+function render(){const E=P[1],M=P[0];
+ $("com").innerHTML=`<div class="h">COM 手札${E.hand.length} 山札${E.deck.length} マナ${E.mana.length} 墓地${E.gy.length}</div><div class="row">${E.shields.map(()=>'<div class="sh"></div>').join("")}</div><div class="row">${fbc(E)}${E.bz.map((c,i)=>card(c,sc!=null&&cur==0&&!over&&(c.t||M.bz[sc].fresh)?"tg":"","tgt("+i+")")).join("")}</div>`;
+ $("me").innerHTML=`<div class="row">${fbc(M)}${M.bz.map((c,i)=>card(c,evo||pend&&!c.t&&c.ab.includes("b")&&!(c.seals&&c.seals.length)?"tg":sc==i?"sel":"","selC("+i+")")).join("")}</div><div class="h">マナ(${M.mana.filter(m=>!m.t).length}/${M.mana.length})</div><div class="row">${M.mana.map(m=>`<div class="mn ${m.c} ${m.t?"t":""}"></div>`).join("")}</div><div class="h">あなた シールド${M.shields.length} 山札${M.deck.length} 墓地${M.gy.length}</div><div class="row">${M.hand.map((c,i)=>card(c,sh1==i?"sel":"","selH("+i+")")).join("")}</div>`;
+ const my=cur==0&&!over,c=sh1!=null?M.hand[sh1]:null,a=sc!=null?M.bz[sc]:null;
+ $("ac").innerHTML=over?`<button onclick="pick()">もう一度</button>`:`<button ${my&&c&&!charged?"":"disabled"} onclick="charge()">マナに置く</button><button ${my&&c&&c.ty!="e"&&can(0,c)?"":"disabled"} onclick="use()">${c&&c.ty=="s"?"呪文を唱える":"召喚"}</button><button ${my&&c&&c.ty=="e"&&can(0,c)?"":"disabled"} onclick="evoMode()">${evo?"進化(元を選択中)":"進化"}</button><button ${my&&a&&!a.t&&!a.sick&&!a.fresh&&!(a.seals&&a.seals.length)?"":"disabled"} onclick="tgt('p')">プレイヤーを攻撃</button><button ${my?"":"disabled"} onclick="turn(1)">ターン終了</button>${pend?'<button onclick="nb()">ブロックしない</button>':""}<div class="h">攻撃:自分のクリーチャーを選択→相手のタップ中(赤枠)をタップ、またはボタン</div>`}
+function selH(i){if(cur||over)return;evo=false;sh1=sh1==i?null:i;render()}
+function evoMode(){evo=!evo;if(evo)log("進化元にする自分のクリーチャーをタップしてください");render()}
+function selC(i){if(evo&&!cur&&!over){const c=P[0].hand[sh1],b=P[0].bz[i];if(!c||b.forb||!can(0,c,b)){log("コストが足りません");return}evo=false;sh1=null;play(0,c,b);render();return}
+ if(pend){const b=P[0].bz[i];if(b.t||!b.ab.includes("b")||(b.seals&&b.seals.length))return;const p=pend;pend=null;log(b.n+"がブロック!");b.t=true;fight(1,p.c,b);render();return p.r()}
+ if(cur||over)return;sc=sc==i?null:i;render()}
+function nb(){const p=pend;pend=null;hit(1,p.c);render();p.r()}
+function hit(me,c){const D=P[1-me];if(!D.shields.length)return end(me,"(ダイレクトアタック)");brk(1-me,c.ab.includes("w")?2:1)}
+const ready=A=>A.bz.filter(c=>!c.t&&!c.sick&&!c.forb&&!(c.seals&&c.seals.length));
+function can(i,c,b){const A=P[i];return A.mana.filter(m=>!m.t).length+(c.ab.includes("r")?ready(A).filter(x=>x!=b).length:0)>=c.cost&&(c.ty!="e"||A.bz.some(x=>!x.forb))}
+const autoB=A=>[...A.bz.filter(x=>!x.forb)].sort((x,y)=>(x.t||x.sick)-(y.t||y.sick)||x.pw-y.pw)[0];
+function charge(){const A=P[0],c=A.hand.splice(sh1,1)[0];c.t=false;A.mana.push(c);log("マナチャージ:"+c.n);charged=true;sh1=null;render()}
+function use(){const c=P[0].hand[sh1];sh1=null;play(0,c);render()}
+const fbc=p=>p.fb&&!p.fb.flipped?`<div class="card r"><b>禁断</b>🔒封印${p.fb.seals.length}枚<br>クリーチャーを出すたび1枚外れる</div>`:"";
+function kill(i,c){P[i].bz=P[i].bz.filter(x=>x!=c);if(c.forb)return end(1-i,"(禁断が場を離れた)");P[i].gy.push(...(c.seals||[]),c);c.seals=[];log(c.n+"が墓地へ")}
+function flip(i){const A=P[i],D=P[1-i];A.fb.flipped=true;A.bz.push({n:"禁断・真",c:"r",cost:99,pw:99999,ty:"c",ab:"",fx:"",forb:true,t:false,sick:true,mod:0,fresh:false,seals:[]});log("🔥禁断が真の姿を現した!相手の全クリーチャーに封印!");D.bz.forEach(d=>{if(D.deck.length){d.seals=d.seals||[];d.seals.push(D.deck.pop())}})}
+function peelF(i){const A=P[i];if(!A.fb||A.fb.flipped||!A.fb.seals.length)return;A.hand.push(A.fb.seals.pop());log("禁断の封印が外れた(残り"+A.fb.seals.length+"枚)");if(!A.fb.seals.length)flip(i)}
+function entered(i){const A=P[i];peelF(i);const s=A.bz.filter(c=>c.seals&&c.seals.length).sort((x,y)=>ep(y)-ep(x))[0];if(s){A.gy.push(s.seals.pop());log(s.n+"の封印を1枚剥がした")}}
+function disc(i,n){const A=P[i];while(n--&&A.hand.length){const c=A.hand.splice(Math.random()*A.hand.length|0,1)[0];A.gy.push(c);log("ハンデス:"+c.n)}}
+function free(i,c){const A=P[i];c.t=false;c.sick=!/[sf]/.test(c.ab);c.fresh=c.ab.includes("f");A.bz.push(c);entered(i);fx(i,c.fx,c)}
+function fx(i,f,src){if(!f)return;const A=P[i],D=P[1-i];f.split("|").forEach(x=>{const[a,l]=x.split(":"),k=a[0],N=+a.slice(1),lim=l?l*1000:1e9;
+ if(k=="p"){D.bz.forEach(c=>c.mod=(c.mod||0)-N*1000);log("相手の全クリーチャー パワー−"+N*1000);D.bz.filter(c=>ep(c)<=0).forEach(c=>kill(1-i,c))}
+ else if(k=="q"){disc(i,N);disc(1-i,N)}
+ else if(k=="c"||k=="a"){const src2=k=="c"?A.deck:A.hand,cs=src2.filter(c=>c.ty=="c"&&c.cost<=N);if(cs.length){const c=best(cs);src2.splice(src2.indexOf(c),1);if(k=="c")sh(A.deck);log("追加召喚:"+c.n);free(i,c)}}
+ else for(let n=N;n>0;n--){
+  if(k=="d"&&A.deck.length)A.hand.push(A.deck.pop());
+  if(k=="m"&&A.deck.length){const c=A.deck.pop();c.t=false;A.mana.push(c)}
+  if(k=="h"&&A.deck.length)A.shields.push(A.deck.pop());
+  if(k=="o")peelF(i);
+  if(k=="y"){const c=strong(D.bz.filter(d=>ep(d)<=lim));if(c){D.bz=D.bz.filter(d=>d!=c);if(c.forb)return end(i,"(禁断が場を離れた)");D.gy.push(...(c.seals||[]));c.seals=[];c.t=false;c.mod=0;A.shields.push(c);log(c.n+"をシールドに貼り付けた!")}}
+  if(k=="n"&&D.mana.length){let j=D.mana.findIndex(m=>!m.t);if(j<0)j=D.mana.length-1;const c=D.mana.splice(j,1)[0];c.t=false;A.shields.push(c);log("相手のマナをシールドに貼り付けた!")}
+  if(k=="x"){const c=strong(D.bz.filter(d=>ep(d)<=lim));if(c)kill(1-i,c)}
+  if(k=="u"){const c=strong(D.bz.filter(d=>ep(d)<=lim));if(c){D.bz=D.bz.filter(d=>d!=c);if(c.forb)return end(i,"(禁断が場を離れた)");D.gy.push(...(c.seals||[]));c.seals=[];c.t=false;c.mod=0;D.hand.push(c);log(c.n+"を手札に戻した")}}
+  if(k=="k"&&D.mana.length){let j=D.mana.findIndex(m=>!m.t);if(j<0)j=D.mana.length-1;log("マナ破壊:"+D.mana.splice(j,1)[0].n)}
+  if(k=="r")disc(1-i,1);
+  if(k=="v"){const cs=A.gy.filter(c=>c.ty=="c"&&c.cost<src.cost);if(cs.length){const c=best(cs);A.gy.splice(A.gy.indexOf(c),1);log("蘇生:"+c.n);free(i,c)}}
+  if(k=="z"){const cs=A.gy.filter(c=>c.ty=="s"&&c.cost<src.cost&&!/z/.test(c.fx));if(cs.length){const c=best(cs);log("呪文再発動:"+c.n);fx(i,c.fx,c)}}}})}
+function play(i,c,base){const A=P[i],b=c.ty=="e"?(base||autoB(A)):null;let n=c.cost;for(const m of A.mana)if(!m.t&&n){m.t=true;n--}
+ if(n&&c.ab.includes("r"))for(const x of [...ready(A)].filter(x=>x!=b).sort((p,q)=>p.pw-q.pw)){if(!n)break;x.t=true;n--}
+ A.hand.splice(A.hand.indexOf(c),1);log((i?"COM":"あなた")+"が"+(c.ty=="s"?"呪文":"召喚")+":"+c.n);
+ if(c.ty=="s"){A.gy.push(c);return fx(i,c.fx,c)}
+ if(c.ty=="e"){log(b.n+"に重ねて進化!");A.bz=A.bz.filter(x=>x!=b);c.t=b.t;c.sick=b.sick;c.fresh=false;c.seals=b.seals||[];A.bz.push(c);entered(i);fx(i,c.fx,c)}else free(i,c)}
+function tgt(t){if(cur||over||sc==null)return;const c=P[0].bz[sc];if(c.t||c.sick||(c.seals&&c.seals.length))return;
+ if(t=="p"){if(c.fresh)return}else if(!P[1].bz[t].t&&!c.fresh)return;atk(0,sc,t);sc=null;render()}
+function fight(me,c,d){log(`${c.n}(${ep(c)}) vs ${d.n}(${ep(d)})`);if(ep(c)>=ep(d))kill(1-me,d);if(ep(c)<=ep(d))kill(me,c)}
+function brk(di,n){const T=P[di];let k=0;while(n--&&T.shields.length){const c=T.shields.pop();k++;
+ if(c.ab.includes("t")){log("⚡S・トリガー発動!"+c.n);if(c.ty=="s"){T.gy.push(c);fx(di,c.fx,c)}else free(di,c)}else T.hand.push(c)}
+ log("シールドを"+k+"枚ブレイク!")}
+function atk(me,ai,t){const A=P[me],D=P[1-me],c=A.bz[ai];c.t=true;
+ if(t=="p"){const bls=D.bz.filter(x=>!x.t&&x.ab.includes("b")&&!(x.seals&&x.seals.length));
+  if(me==1&&bls.length)return new Promise(r=>{pend={c,r};log("⚠ "+c.n+"の攻撃!アンタップ中のブロッカーをタップしてブロック、または「ブロックしない」");render()});
+  const bl=strong(bls);
+  if(bl){log(bl.n+"がブロック!");bl.t=true;return fight(me,c,bl)}
+  hit(me,c)}
+ else fight(me,c,D.bz[t])}
+async function com(){const A=P[1];await sleep(700);
+ if(A.hand.length&&A.mana.length<9){const s=[...A.hand].sort((a,b)=>b.cost-a.cost),c=s[0].cost>A.mana.length+1?s[0]:s[s.length-1];A.hand.splice(A.hand.indexOf(c),1);c.t=false;A.mana.push(c);log("COMがマナチャージ")}
+ render();await sleep(600);
+ const use=c=>{if(c.ty!="s")return true;const k=c.fx[0],l=(c.fx.split(":")[1]||1e6)*1000,pb=P[0];
+  return k=="x"||k=="u"||k=="y"?pb.bz.some(d=>ep(d)<=l):k=="k"||k=="n"?pb.mana.length>0:k=="p"?pb.bz.length>0:k=="v"?A.gy.some(d=>d.ty=="c"&&d.cost<c.cost):k=="z"?A.gy.some(d=>d.ty=="s"&&d.cost<c.cost):k=="q"?A.hand.length>1:k=="o"?!!(A.fb&&!A.fb.flipped):true};
+ for(const c of [...A.hand].sort((a,b)=>b.cost-a.cost)){if(over)return;if(!A.hand.includes(c)||!can(1,c,c.ty=="e"?autoB(A):null)||!use(c))continue;play(1,c);render();await sleep(800)}
+ for(const c of [...A.bz]){if(over)return;if(c.t||c.sick||(c.seals&&c.seals.length)||!A.bz.includes(c))continue;
+  const E=P[0].bz.map((d,i)=>[d,i]).filter(([d])=>(d.t||c.fresh)&&ep(d)<ep(c)).sort((x,y)=>ep(y[0])-ep(x[0]));
+  if(E.length)await atk(1,A.bz.indexOf(c),E[0][1]);else if(!c.fresh)await atk(1,A.bz.indexOf(c),"p");else continue;render();await sleep(900)}
+ if(!over)turn(0)}
+pick();
+</script></body></html>
